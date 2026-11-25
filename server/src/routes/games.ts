@@ -1,132 +1,19 @@
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
-import { loadSeedGames, type Store } from '../db.js';
+import { applyGameFields } from '../core/games.js';
+import type { Repo } from '../core/repo.js';
+import type { Service } from '../core/service.js';
 import type { GameDoc } from '../engine/types.js';
-import { h, HttpError, int, notFound, str, strList } from '../lib/http.js';
+import { h, HttpError, str } from '../lib/http.js';
 import { bggIdFromUrl, bggSearch, bggThing, generateGameSheet, integrations } from '../lib/integrations.js';
 
-const MODES = ['points', 'countdown'] as const;
-const WINS = ['high', 'low'] as const;
-const ENDS = ['target', 'rounds', 'manual', 'zero'] as const;
-const ENTRIES = ['round', 'free'] as const;
-
-const pickEnum = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
-  allowed.includes(v as T) ? (v as T) : fallback;
-
-function numMap(v: unknown): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (v && typeof v === 'object') {
-    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-      const n = int(val);
-      if (n !== null && /^\d+$/.test(k)) out[k] = n;
-    }
-  }
-  return out;
-}
-
-/** Aplica sobre `base` los campos editables recibidos (whitelist + validación). */
-export function applyGameFields(base: GameDoc, body: Record<string, unknown>): GameDoc {
-  const g: GameDoc = { ...base };
-  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
-  if (has('name')) g.name = str(body.name, 80) || g.name;
-  if (has('emoji')) g.emoji = str(body.emoji, 16) || g.emoji;
-  if (has('color')) g.color = str(body.color, 9) || g.color;
-  for (const k of ['category', 'description', 'manufacturer', 'objective', 'rules_url'] as const)
-    if (has(k)) g[k] = str(body[k], 2000);
-  if (has('entry_label')) g.entry_label = str(body.entry_label, 24) || 'puntos';
-  for (const k of ['rules', 'setup', 'scoring_notes', 'aliases'] as const) if (has(k)) g[k] = strList(body[k]);
-  if (has('mode')) g.mode = pickEnum(body.mode, MODES, g.mode);
-  if (has('win_condition')) g.win_condition = pickEnum(body.win_condition, WINS, g.win_condition);
-  if (has('end_type')) g.end_type = pickEnum(body.end_type, ENDS, g.end_type);
-  if (has('entry_mode')) g.entry_mode = pickEnum(body.entry_mode, ENTRIES, g.entry_mode);
-  if (has('target_score')) g.target_score = int(body.target_score);
-  if (has('rounds_count')) g.rounds_count = int(body.rounds_count);
-  if (has('start_score_default')) g.start_score_default = int(body.start_score_default, 0) ?? 0;
-  if (has('default_entry')) g.default_entry = int(body.default_entry);
-  if (has('alert_margin')) g.alert_margin = int(body.alert_margin, 0) ?? 0;
-  if (has('min_players')) g.min_players = Math.max(1, int(body.min_players, 2) ?? 2);
-  if (has('max_players')) g.max_players = Math.max(g.min_players, int(body.max_players, 8) ?? 8);
-  if (has('target_by_players')) g.target_by_players = numMap(body.target_by_players);
-  if (has('start_scores')) g.start_scores = numMap(body.start_scores);
-  if (has('teams')) g.teams = Boolean(body.teams);
-  if (has('hidden')) g.hidden = Boolean(body.hidden);
-  if (has('images')) g.images = strList(body.images, 60);
-  if (has('image_url')) g.image_url = str(body.image_url, 3_000_000) || null;
-  if (has('bgg_id')) g.bgg_id = int(body.bgg_id);
-  // El presupuesto siempre termina al llegar a 0.
-  if (g.mode === 'countdown') g.end_type = 'zero';
-  else if (g.end_type === 'zero') g.end_type = 'target';
-  return g;
-}
-
-function blankGame(id: string, sortOrder: number): GameDoc {
-  return {
-    id,
-    name: '',
-    emoji: '🎴',
-    color: '#8B5CF6',
-    category: '',
-    description: '',
-    rules: [],
-    mode: 'points',
-    win_condition: 'high',
-    end_type: 'target',
-    target_score: 100,
-    target_by_players: {},
-    rounds_count: null,
-    start_scores: {},
-    start_score_default: 0,
-    entry_mode: 'round',
-    entry_label: 'puntos',
-    default_entry: null,
-    alert_margin: 10,
-    min_players: 2,
-    max_players: 8,
-    aliases: [],
-    manufacturer: '',
-    objective: '',
-    setup: [],
-    scoring_notes: [],
-    rules_url: '',
-    image_url: null,
-    images: [],
-    bgg_id: null,
-    teams: false,
-    is_custom: true,
-    sort_order: sortOrder,
-    hidden: false,
-    ai_status: null,
-    ai_error: null,
-  };
-}
-
-const sortGames = (games: GameDoc[]) => [...games].sort((a, b) => a.sort_order - b.sort_order);
-
-export function gamesRouter(store: Store) {
+export function gamesRouter(svc: Service, repo: Repo) {
   const r = Router();
-  const nextOrder = () => Math.max(-1, ...store.all<GameDoc>('games').map((g) => g.sort_order)) + 1;
-  const mustGet = (id: string) => {
-    const g = store.get<GameDoc>('games', id);
-    if (!g) throw notFound('Juego');
-    return g;
-  };
 
-  r.get('/', h(() => sortGames(store.all<GameDoc>('games'))));
+  r.get('/', h(() => svc.games.list()));
   r.get('/integrations', h(() => ({ ai: integrations.aiEnabled(), bgg: integrations.bggEnabled() })));
-  r.get('/:id', h((req) => mustGet(req.params.id)));
-
+  r.get('/:id', h((req) => svc.games.get(req.params.id)));
   /** Alta manual ("Prefiero rellenarlo yo"). */
-  r.post(
-    '/',
-    h((req) => {
-      const name = str(req.body?.name, 80);
-      if (!name) throw new HttpError(400, 'El nombre es obligatorio');
-      const g = applyGameFields(blankGame(randomUUID(), nextOrder()), req.body ?? {});
-      g.name = name;
-      store.put('games', g);
-      return g;
-    }),
-  );
+  r.post('/', h((req) => svc.games.create(req.body)));
 
   /** "Crear ficha con IA": crea la ficha en estado pending y la completa en segundo plano. */
   r.post(
@@ -136,14 +23,11 @@ export function gamesRouter(store: Store) {
       if (!name) throw new HttpError(400, 'Escribe el nombre del juego');
       if (!integrations.aiEnabled())
         throw new HttpError(503, 'La creación con IA no está configurada (falta ANTHROPIC_API_KEY). Usa «Prefiero rellenarlo yo».');
-      const g = blankGame(randomUUID(), nextOrder());
-      g.name = name;
-      g.ai_status = 'pending';
-      store.put('games', g);
+      const g = svc.games.createPending(name);
       void (async () => {
         try {
           const sheet = await generateGameSheet(name);
-          const current = store.get<GameDoc>('games', g.id);
+          const current = repo.get<GameDoc>('games', g.id);
           if (!current) return;
           const filled = applyGameFields(current, sheet as unknown as Record<string, unknown>);
           filled.name = sheet.name || name;
@@ -158,68 +42,34 @@ export function gamesRouter(store: Store) {
           }
           filled.ai_status = 'ready';
           filled.ai_error = null;
-          store.put('games', filled);
+          repo.put('games', filled);
         } catch (e) {
-          const current = store.get<GameDoc>('games', g.id);
-          if (current) {
-            current.ai_status = 'error';
-            current.ai_error = e instanceof Error ? e.message : String(e);
-            store.put('games', current);
-          }
+          const current = repo.get<GameDoc>('games', g.id);
+          if (current) repo.put('games', { ...current, ai_status: 'error', ai_error: e instanceof Error ? e.message : String(e) });
         }
       })();
       return g;
     }),
   );
 
-  r.put(
-    '/:id',
-    h((req) => {
-      const g = applyGameFields(mustGet(req.params.id), req.body ?? {});
-      store.put('games', g);
-      return g;
-    }),
-  );
-
+  r.put('/:id', h((req) => svc.games.update(req.params.id, req.body)));
   /** "Restablecer valores oficiales" (solo juegos del catálogo). */
-  r.post(
-    '/:id/reset',
-    h((req) => {
-      const g = mustGet(req.params.id);
-      const official = loadSeedGames().find((s) => s.id === g.id);
-      if (!official) throw new HttpError(400, 'Este juego no tiene valores oficiales que restablecer');
-      const restored: GameDoc = { ...official, hidden: g.hidden, images: g.images, image_url: g.image_url };
-      store.put('games', restored);
-      return restored;
-    }),
-  );
+  r.post('/:id/reset', h((req) => svc.games.reset(req.params.id)));
 
   /** Importar imágenes oficiales desde un enlace de BoardGameGeek. */
   r.post(
     '/:id/bgg',
     h(async (req) => {
-      const g = mustGet(req.params.id);
+      const g = svc.games.get(req.params.id);
       const id = bggIdFromUrl(str(req.body?.url, 500));
       if (!id) throw new HttpError(400, 'Pega un enlace de boardgamegeek.com/boardgame/…');
       const thing = await bggThing(id);
       const add = [thing.image].filter((x): x is string => Boolean(x) && !g.images.includes(x as string));
-      g.images = [...g.images, ...add];
-      if (!g.image_url && g.images[0]) g.image_url = g.images[0];
-      g.bgg_id = id;
-      store.put('games', g);
-      return g;
+      const images = [...g.images, ...add];
+      return svc.games.update(g.id, { images, image_url: g.image_url ?? images[0] ?? null, bgg_id: id });
     }),
   );
 
-  r.delete(
-    '/:id',
-    h((req) => {
-      const g = mustGet(req.params.id);
-      if (!g.is_custom) throw new HttpError(400, 'Los juegos del catálogo no se borran: puedes ocultarlos');
-      store.delete('games', g.id);
-      return { ok: true };
-    }),
-  );
-
+  r.delete('/:id', h((req) => svc.games.remove(req.params.id)));
   return r;
 }

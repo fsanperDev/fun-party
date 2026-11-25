@@ -33,6 +33,7 @@ Es una reconstrucción funcional, independiente y con código propio de la aplic
 fun-party/
 ├─ server/                 API REST + SQLite (Node 20+, Express 5, better-sqlite3, TypeScript)
 │  ├─ src/engine/          Motor de puntuación puro (totales, turnos, fin, avisos, ranking)
+│  ├─ src/core/            Servicio con todas las operaciones (lo usan la API y el modo local)
 │  ├─ src/routes/          games · players · matches · stats
 │  ├─ src/lib/             utilidades HTTP, constantes, integraciones opcionales (IA, BGG)
 │  ├─ src/seed-games.json  Catálogo oficial de 20 juegos (se carga la primera vez)
@@ -40,6 +41,8 @@ fun-party/
 ├─ client/                 SPA React 19 + Vite + Tailwind v4 + TanStack Query + Motion + Recharts
 │  └─ src/{pages,components,hooks,lib}
 ├─ e2e/run.mjs             Recorrido completo en navegador (Playwright)
+├─ e2e/pages.mjs           Prueba de la versión GitHub Pages (modo local)
+├─ .github/workflows/      CI (tests) y publicación en GitHub Pages
 └─ docs/AUDITORIA.md       Inventario de la app original y decisiones de reconstrucción
 ```
 
@@ -83,6 +86,21 @@ docker build -t fun-party .
 docker run -p 8001:8001 -v fun-party-data:/app/server/data fun-party
 ```
 
+### GitHub Pages (sin servidor)
+
+Hay una versión **100 % estática** que se publica sola en GitHub Pages. Ejecuta el mismo núcleo de puntuación (`server/src/core`) dentro del navegador y guarda los datos en **IndexedDB**.
+
+1. Sube el repositorio a GitHub (debe ser **público** para usar Pages gratis).
+2. En el repositorio, ve a **Settings → Pages → Build and deployment → Source** y elige **GitHub Actions**.
+3. Haz un push a `main` (o pulsa **Run workflow** en *Actions → Deploy to GitHub Pages*).
+4. Abre `https://<usuario>.github.io/<repositorio>/`.
+
+Diferencias con la versión con servidor:
+- Los datos viven en cada dispositivo. Para pasarlos de uno a otro usa **Ajustes › Partidas › Copia de seguridad** (Exportar / Importar JSON).
+- «Crear ficha con IA» e «Importar desde BoardGameGeek» no están disponibles, porque necesitan claves en un servidor. El resto funciona igual, incluida la voz (Pages sirve con HTTPS).
+
+Para compilarla en local: `VITE_STORAGE=local VITE_BASE=/fun-party/ npm run build -w client`.
+
 ### Usarlo desde el móvil
 
 Arranca con `npm start` y abre `http://<IP-de-tu-ordenador>:8001` desde el móvil en la misma red. El micrófono del navegador solo funciona en **HTTPS** o en `localhost`, así que para usar la voz en el móvil publica la app tras un proxy con HTTPS (Caddy, Nginx, Cloudflare Tunnel…). La entrada escrita funciona siempre.
@@ -100,6 +118,8 @@ Copia `.env.example` a `.env` o define las variables en tu sistema. Todas son op
 | `AI_MODEL` | `claude-sonnet-5-5` | Modelo usado para generar la ficha. |
 | `BGG_API_TOKEN` | — | Activa «Importar desde BoardGameGeek» (la API XML de BGG exige token). |
 | `VITE_API_URL` | (mismo origen) | Solo si sirves el frontend en otro dominio que la API. |
+| `VITE_STORAGE` | — | `local` = versión sin servidor (GitHub Pages, datos en el navegador). |
+| `VITE_BASE` | `/` | Ruta base de la web (en Pages, `/<repositorio>/`; el workflow la pone sola). |
 
 El repositorio no incluye ninguna clave ni credencial.
 

@@ -2,7 +2,7 @@ import { ImagePlus, Link2, Loader2, Star, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { keys, useInvalidate } from '../hooks/queries';
-import { api } from '../lib/api';
+import { api, LOCAL_MODE } from '../lib/api';
 import type { Game } from '../lib/types';
 import { cn, imageFileToDataUrl } from '../lib/utils';
 import { Button } from './ui/Button';
@@ -98,6 +98,7 @@ export function ImagesDialog({ game, open, onClose }: { game: Game; open: boolea
             <Link2 className="size-4" />
           </Button>
         </div>
+        {!LOCAL_MODE && (
         <div className="rounded-2xl border border-line p-3">
           <p className="mb-2 text-xs text-zinc-400">Importar imágenes oficiales: pega el enlace del juego en boardgamegeek.com</p>
           <div className="flex gap-2">
@@ -107,6 +108,7 @@ export function ImagesDialog({ game, open, onClose }: { game: Game; open: boolea
             </Button>
           </div>
         </div>
+        )}
       </div>
     </Dialog>
   );

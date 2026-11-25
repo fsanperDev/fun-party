@@ -1,10 +1,11 @@
 {
   "name": "Fun Party · Marcador de juegos de cartas",
   "short_name": "Fun Party",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#090A10",
   "theme_color": "#090A10",
   "lang": "es",
-  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
 }

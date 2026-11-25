@@ -1,4 +1,6 @@
-import { ChevronDown, ChevronUp, Mic, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Mic, Pencil, Plus, Star, Trash2, Upload } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRef } from 'react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,6 +14,7 @@ import { Tabs } from '../components/ui/Segmented';
 import { keys, useInvalidate, useMatches, usePlayers } from '../hooks/queries';
 import { api } from '../lib/api';
 import { VOICE_HELP } from '../lib/constants';
+import { getBackup } from '../lib/local/backup';
 import type { Player } from '../lib/types';
 import { joinNames, shortDate } from '../lib/utils';
 
@@ -119,6 +122,63 @@ function VoiceTab() {
   );
 }
 
+/** Copia de seguridad del modo local (GitHub Pages): exportar e importar todos los datos. */
+function BackupCard() {
+  const backup = getBackup();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const qc = useQueryClient();
+  const confirm = useConfirm();
+  if (!backup) return null;
+
+  function download() {
+    const blob = new Blob([JSON.stringify(backup!.export(), null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `fun-party-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    const ok = await confirm({
+      title: '¿Importar la copia?',
+      description: 'Se sustituirán todos los jugadores, juegos y partidas de este dispositivo.',
+      confirmLabel: 'Importar',
+      danger: true,
+    });
+    if (fileRef.current) fileRef.current.value = '';
+    if (!ok) return;
+    try {
+      await backup!.import(JSON.parse(await file.text()));
+      await qc.invalidateQueries();
+      toast.success('Copia importada');
+    } catch (e) {
+      toast.error((e as Error).message || 'No se pudo leer el archivo');
+    }
+  }
+
+  return (
+    <div className="card mt-6 p-4">
+      <p className="font-bold">Copia de seguridad</p>
+      <p className="mt-1 text-sm text-zinc-400">
+        En la versión web los datos se guardan en este dispositivo
+        {backup.persistent ? '' : ' (este navegador no permite guardarlos: se perderán al cerrar)'}. Exporta una copia para
+        pasarlos a otro móvil o guardarlos.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button variant="secondary" onClick={download}>
+          <Download className="size-4" /> Exportar
+        </Button>
+        <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+          <Upload className="size-4" /> Importar
+        </Button>
+      </div>
+      <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
+    </div>
+  );
+}
+
 function MatchesTab() {
   const { data: matches = [] } = useMatches();
   const invalidate = useInvalidate();
@@ -131,8 +191,9 @@ function MatchesTab() {
     await invalidate(keys.matches, keys.stats);
   }
 
-  if (!matches.length) return <p className="py-6 text-center text-sm text-zinc-500">Todavía no hay partidas.</p>;
   return (
+    <>
+      {!matches.length && <p className="py-6 text-center text-sm text-zinc-500">Todavía no hay partidas.</p>}
     <ul className="space-y-2">
       {matches.map((m) => {
         const winners = m.players.filter((p) => m.winner_ids.includes(p.id)).map((p) => p.name);
@@ -154,6 +215,8 @@ function MatchesTab() {
         );
       })}
     </ul>
+      <BackupCard />
+    </>
   );
 }
 

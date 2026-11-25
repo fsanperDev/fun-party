@@ -21,7 +21,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   return data as T;
 }
 
-export const api = {
+const remoteApi = {
   games: {
     list: () => req<Game[]>('GET', '/games'),
     get: (id: string) => req<Game>('GET', `/games/${id}`),
@@ -63,3 +63,17 @@ export const api = {
     undoReset: () => req<Stats>('POST', '/stats/reset/undo'),
   },
 };
+
+export type Api = typeof remoteApi;
+
+/** true en la versión estática (GitHub Pages): los datos se guardan en el navegador. */
+export const LOCAL_MODE = import.meta.env.VITE_STORAGE === 'local';
+
+/**
+ * Cliente activo. Es un enlace "vivo" de ES modules: en modo local se sustituye
+ * al arrancar (ver main.tsx) antes de pintar la app.
+ */
+export let api: Api = remoteApi;
+export function setApi(a: Api) {
+  api = a;
+}

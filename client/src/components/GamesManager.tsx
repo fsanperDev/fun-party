@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { keys, useGames, useInvalidate } from '../hooks/queries';
-import { api } from '../lib/api';
+import { api, LOCAL_MODE } from '../lib/api';
 import type { Game } from '../lib/types';
 import { cn, gameRule, norm } from '../lib/utils';
 import { GameFormDialog } from './GameFormDialog';
@@ -85,7 +85,11 @@ function AddGameDialog({ open, onClose }: { open: boolean; onClose: () => void }
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Crear ficha con IA
           </Button>
           {integrations?.ai === false && (
-            <p className="text-xs text-zinc-500">La IA no está configurada en este servidor (ANTHROPIC_API_KEY). Puedes rellenarlo tú.</p>
+            <p className="text-xs text-zinc-500">
+              {LOCAL_MODE
+                ? 'La creación con IA necesita el servidor; en la versión web estática rellena la ficha tú.'
+                : 'La IA no está configurada en este servidor (ANTHROPIC_API_KEY). Puedes rellenarlo tú.'}
+            </p>
           )}
           <Button variant="outline" className="w-full" onClick={() => setManual(true)}>
             <Pencil className="size-4" /> Prefiero rellenarlo yo

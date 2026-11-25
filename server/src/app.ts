@@ -2,7 +2,8 @@ import cors from 'cors';
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
-import { seedIfEmpty, Store } from './db.js';
+import { createService } from './core/service.js';
+import { loadSeedGames, Store } from './db.js';
 import { errorHandler } from './lib/http.js';
 import { gamesRouter } from './routes/games.js';
 import { matchesRouter } from './routes/matches.js';
@@ -17,7 +18,8 @@ export interface AppOptions {
 
 export function createApp({ dbFile, staticDir }: AppOptions) {
   const store = new Store(dbFile);
-  seedIfEmpty(store);
+  const svc = createService(store, loadSeedGames);
+  svc.seedIfEmpty();
 
   const app = express();
   app.disable('x-powered-by');
@@ -26,10 +28,10 @@ export function createApp({ dbFile, staticDir }: AppOptions) {
   app.use(express.json({ limit: '15mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
-  app.use('/api/games', gamesRouter(store));
-  app.use('/api/players', playersRouter(store));
-  app.use('/api/matches', matchesRouter(store));
-  app.use('/api/stats', statsRouter(store));
+  app.use('/api/games', gamesRouter(svc, store));
+  app.use('/api/players', playersRouter(svc));
+  app.use('/api/matches', matchesRouter(svc));
+  app.use('/api/stats', statsRouter(svc));
   app.use('/api', (_req, res) => res.status(404).json({ detail: 'Ruta no encontrada' }));
 
   if (staticDir && fs.existsSync(path.join(staticDir, 'index.html'))) {

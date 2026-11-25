@@ -9,7 +9,7 @@
  * - Fin automático: objetivo (al completar ronda en modo round), nº de rondas, o saldo a 0.
  * - Avisos al acercarse al fin, con los textos exactos de la app original.
  */
-import { randomUUID } from 'node:crypto';
+import { uuid as randomUUID } from '../core/uuid.js';
 import type {
   ChartPoint,
   Entry,

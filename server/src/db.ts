@@ -7,13 +7,13 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Collection, Repo } from './core/repo.js';
 import type { GameDoc, MatchDoc, PlayerDoc } from './engine/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-export type Collection = 'games' | 'players' | 'matches';
 
-export class Store {
+export class Store implements Repo {
   db: Database.Database;
 
   constructor(file: string) {
@@ -49,7 +49,7 @@ export class Store {
     return row ? (JSON.parse(row.data) as T) : null;
   }
 
-  put(table: Collection, doc: { id: string; created_at?: string }) {
+  put<T extends { id: string; created_at?: string }>(table: Collection, doc: T) {
     if (table === 'matches') {
       this.db
         .prepare(
@@ -86,6 +86,10 @@ export class Store {
       .run(key, value);
   }
 
+  deleteSetting(key: string) {
+    this.db.prepare('DELETE FROM settings WHERE key = ?').run(key);
+  }
+
   transaction<T>(fn: () => T): T {
     return this.db.transaction(fn)();
   }
@@ -95,16 +99,6 @@ export class Store {
 export function loadSeedGames(): GameDoc[] {
   const file = path.join(here, 'seed-games.json');
   return JSON.parse(fs.readFileSync(file, 'utf8')) as GameDoc[];
-}
-
-/** Inserta el catálogo de juegos la primera vez que arranca la base de datos. */
-export function seedIfEmpty(store: Store) {
-  const count = store.db.prepare('SELECT COUNT(*) AS n FROM games').get() as { n: number };
-  if (count.n > 0) return false;
-  store.transaction(() => {
-    for (const g of loadSeedGames()) store.put('games', g);
-  });
-  return true;
 }
 
 export type { GameDoc, MatchDoc, PlayerDoc };
