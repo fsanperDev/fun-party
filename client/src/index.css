@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource-variable/jetbrains-mono';
+
+/* Tokens de diseño extraídos de la app original (Tailwind v4, paleta zinc + violeta). */
+@theme {
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --color-page: #090a10;
+  --color-surface: #13131f;
+  --color-surface-2: #191b2a;
+  --color-surface-3: #1f2233;
+  --color-line: #1e2235;
+  --color-line-strong: #2e3650;
+  --radius-card: 18px;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-line);
+  }
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--color-page);
+    color: var(--color-zinc-100);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    @apply text-xs font-bold tracking-[0.2em] text-violet-400 uppercase;
+  }
+  .card {
+    @apply rounded-[18px] border border-line bg-surface;
+  }
+  .field {
+    @apply h-12 w-full rounded-2xl border border-line bg-surface-2 px-4 text-[15px] text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30;
+  }
+  .textarea {
+    @apply w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-zinc-300;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

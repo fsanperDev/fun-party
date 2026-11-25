@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.tsbuildinfo
+server/data/
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+!.env.example
+e2e/screenshots/
+.DS_Store
+npm-debug.log*
+coverage/
